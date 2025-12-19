@@ -69,7 +69,10 @@
 
         // 3. Запрашиваем баланс (Заглушка, скоро подключим n8n)
         // Пока просто покажем 0, чтобы проверить визуал
-        document.getElementById('balance').innerText = "0";
+        // Читаем баланс из ссылки (URL)
+        const urlParams = new URLSearchParams(window.location.search);
+        const balance = urlParams.get('balance') || "0";
+        document.getElementById('balance').innerText = balance;
 
     </script>
 </body>
