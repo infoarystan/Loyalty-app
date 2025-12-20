@@ -6,14 +6,15 @@
     <title>Loyalty App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background-color: #f4f4f9; margin:0; display:flex; justify-content:center; align-items:center; height:100vh; }
+        body { font-family: -apple-system, sans-serif; background-color: #f4f4f9; margin:0; display:flex; justify-content:center; align-items:center; height:100vh; overflow: hidden; }
         #staff-view, #client-view { display: none; text-align:center; width:90%; max-width:350px; }
         .staff-btn { width:220px; height:220px; border-radius:50%; background:linear-gradient(135deg,#007AFF,#0056b3); color:white; border:none; font-size:22px; font-weight:bold; cursor:pointer; box-shadow:0 8px 25px rgba(0,122,255,0.4); }
         .card { background:white; padding:25px; border-radius:25px; box-shadow:0 10px 30px rgba(0,0,0,0.08); }
         .balance { font-size:50px; font-weight:bold; color:#28a745; margin:10px 0; }
         #qrcode { background:white; padding:15px; border-radius:15px; display:inline-block; margin:15px 0; border:1px solid #eee; }
-        #timer { color:#8e8e93; font-size:14px; font-variant-numeric:tabular-nums; }
+        #timer { color:#8e8e93; font-size:14px; font-variant-numeric: tabular-nums; }
     </style>
 </head>
 <body>
@@ -27,18 +28,20 @@
         <p style="color:#8e8e93; margin:5px 0 0;">Ваши накопленные баллы</p>
         <div class="balance" id="balance">0</div>
         <div id="qrcode"></div>
-        <div id="timer">Обновление кода...</div>
+        <div id="timer">Загрузка кода...</div>
     </div>
 
 <script>
-const STAFF_IDS = [627287121]; // ID кассира
-const SECRET_KEY = "MY_SECRET_KEY"; // должен совпадать с серверной логикой
+const STAFF_IDS = [627287121]; 
+const SECRET_KEY = "MY_SECRET_KEY"; 
 let tg = window.Telegram.WebApp;
+
+// Сообщаем Telegram, что приложение готово к отрисовке
+tg.ready();
 tg.expand();
 
 const user = tg.initDataUnsafe?.user;
 
-// Защита от открытия вне Telegram
 if (!user) {
     document.body.innerHTML = '<h3 style="padding:20px; text-align:center;">Пожалуйста, откройте карту через Telegram</h3>';
 } else {
@@ -46,6 +49,7 @@ if (!user) {
 }
 
 function initApp() {
+    // Используем твой метод start_param для баланса
     const startBalance = tg.initDataUnsafe?.start_param || "0";
     document.getElementById('balance').innerText = startBalance;
 
@@ -53,7 +57,7 @@ function initApp() {
         document.getElementById('staff-view').style.display = 'block';
     } else {
         document.getElementById('client-view').style.display = 'block';
-        document.getElementById('username').innerText = user.first_name;
+        document.getElementById('username').innerText = user.first_name || "Гость";
         startLoyaltyCycle();
     }
 }
@@ -61,9 +65,9 @@ function initApp() {
 function openScanner() {
     tg.showScanQrPopup({ text: 'Наведите на QR клиента' }, (data) => {
         if (!data) return;
+        [span_9](start_span)// По твоей инструкции: Сначала закрываем, потом отправляем данные[span_9](end_span)
         tg.closeScanQrPopup();
-        tg.sendData(data); // отправка данных боту
-        tg.showAlert('QR успешно считан!');
+        tg.sendData(data); 
     });
 }
 
@@ -71,19 +75,26 @@ function startLoyaltyCycle() {
     let timeLeft = 30;
 
     function updateQR() {
-        const timestamp = Math.floor(Date.now() / 1000);
-        const hash = CryptoJS.HmacSHA256(user.id + timestamp, SECRET_KEY).toString(CryptoJS.enc.Hex).substring(0,10);
+        try {
+            const timestamp = Math.floor(Date.now() / 1000);
+            // Хеширование теперь заработает, так как библиотека подключена
+            const hash = CryptoJS.HmacSHA256(user.id.toString() + timestamp.toString(), SECRET_KEY).toString(CryptoJS.enc.Hex).substring(0,10);
 
-        const qrData = JSON.stringify({
-            u: user.id,
-            t: timestamp,
-            s: hash
-        });
+            [span_10](start_span)// Компактный JSON без пробелов (Глава 8.2)[span_10](end_span)
+            const qrData = JSON.stringify({u:user.id,t:timestamp,s:hash});
 
-        const qrDiv = document.getElementById("qrcode");
-        qrDiv.innerHTML = "";
-        new QRCode(qrDiv, { text: qrData, width:200, height:200, correctLevel: QRCode.CorrectLevel.M });
-        timeLeft = 30;
+            const qrDiv = document.getElementById("qrcode");
+            qrDiv.innerHTML = "";
+            new QRCode(qrDiv, { 
+                text: qrData, 
+                width:200, 
+                height:200, 
+                correctLevel: QRCode.CorrectLevel.M 
+            });
+            timeLeft = 30;
+        } catch (e) {
+            console.error("QR Error:", e);
+        }
     }
 
     updateQR();
