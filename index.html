@@ -1,67 +1,67 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Loyalty App</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Loyalty App</title>
 
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
-    <style>
-        body {
-            font-family: -apple-system, sans-serif;
-            background-color: #f4f4f9;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
+<style>
+body {
+    font-family: -apple-system, sans-serif;
+    background: #f4f4f9;
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-        #staff-view, #client-view {
-            display: none;
-            text-align: center;
-            width: 90%;
-            max-width: 350px;
-        }
+#staff-view, #client-view {
+    display: none;
+    text-align: center;
+    width: 90%;
+    max-width: 360px;
+}
 
-        .staff-btn {
-            width: 220px;
-            height: 220px;
-            border-radius: 50%;
-            background: #007AFF;
-            color: #fff;
-            border: none;
-            font-size: 20px;
-            font-weight: bold;
-            cursor: pointer;
-        }
+.staff-btn {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: #007AFF;
+    color: #fff;
+    border: none;
+    font-size: 20px;
+    font-weight: bold;
+}
 
-        .card {
-            background: #fff;
-            padding: 25px;
-            border-radius: 20px;
-            box-shadow: 0 4px 15px rgba(0,0,0,.1);
-        }
+.card {
+    background: #fff;
+    padding: 25px;
+    border-radius: 20px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.1);
+}
 
-        .balance {
-            font-size: 50px;
-            font-weight: bold;
-            color: #28a745;
-        }
+.balance {
+    font-size: 52px;
+    font-weight: bold;
+    color: #28a745;
+}
 
-        #qrcode {
-            margin: 15px 0;
-        }
+#qrcode {
+    margin: 20px 0;
+}
 
-        #timer {
-            color: #888;
-            font-size: 14px;
-        }
-    </style>
+#timer {
+    color: #888;
+    font-size: 14px;
+}
+</style>
 </head>
+
 <body>
 
 <div id="staff-view">
@@ -70,89 +70,97 @@
 </div>
 
 <div id="client-view" class="card">
-    <h2 id="username">Загрузка...</h2>
+    <h2 id="username">Гость</h2>
     <div class="balance" id="balance">0</div>
     <div id="qrcode"></div>
-    <div id="timer">Обновление через 30 сек</div>
+    <div id="timer">Код обновится через 60 сек</div>
 </div>
 
 <script>
-    const tg = window.Telegram.WebApp;
-    tg.expand();
+const tg = window.Telegram.WebApp;
+tg.expand();
 
-    const user = tg.initDataUnsafe?.user;
-    const SECRET_KEY = "SECRET";
-    const STAFF_IDS = [627287121];
+const user = tg.initDataUnsafe?.user;
+const SECRET_KEY = "SECRET";          // тот же на сервере
+const STAFF_IDS = [627287121];        // ID кассира
+const QR_TTL = 60;                    // срок жизни QR
 
-    if (!user) {
-        document.body.innerHTML =
-            '<h3 style="padding:20px;text-align:center">Откройте приложение через Telegram</h3>';
+if (!user) {
+    document.body.innerHTML =
+        '<h3 style="padding:20px;text-align:center">Откройте через Telegram</h3>';
+} else {
+    initApp();
+}
+
+function initApp() {
+    const balance = tg.initDataUnsafe?.start_param || "0";
+    document.getElementById("balance").innerText = balance;
+
+    if (STAFF_IDS.includes(user.id)) {
+        document.getElementById("staff-view").style.display = "block";
     } else {
-        initApp();
+        document.getElementById("client-view").style.display = "block";
+        document.getElementById("username").innerText = user.first_name;
+        startQR();
     }
+}
 
-    function initApp() {
-        const balance = tg.initDataUnsafe?.start_param || "0";
-        document.getElementById('balance').innerText = balance;
-
-        if (STAFF_IDS.includes(user.id)) {
-            document.getElementById('staff-view').style.display = 'block';
-        } else {
-            document.getElementById('client-view').style.display = 'block';
-            document.getElementById('username').innerText = user.first_name;
-            startClientQR();
+/* ===== СКАНЕР ===== */
+function openScanner() {
+    tg.showScanQrPopup(
+        { text: "Наведите на QR клиента" },
+        (data) => {
+            if (!data) return;
+            tg.sendData(data);
         }
+    );
+}
+
+/* ===== QR ЛОГИКА ===== */
+function startQR() {
+    let timeLeft = QR_TTL;
+
+    function generateQR() {
+        const ts = Math.floor(Date.now() / 1000);
+        const nonce = Math.random().toString(36).substring(2, 10);
+
+        const signSource = user.id + ts + nonce;
+        const signature = CryptoJS
+            .HmacSHA256(signSource, SECRET_KEY)
+            .toString(CryptoJS.enc.Hex)
+            .substring(0, 12);
+
+        const payload = JSON.stringify({
+            u: user.id,
+            t: ts,
+            n: nonce,
+            s: signature
+        });
+
+        const qrDiv = document.getElementById("qrcode");
+        qrDiv.innerHTML = "";
+
+        new QRCode(qrDiv, {
+            text: payload,
+            width: 240,
+            height: 240,
+            correctLevel: QRCode.CorrectLevel.M
+        });
+
+        timeLeft = QR_TTL;
     }
 
-    function openScanner() {
-        tg.showScanQrPopup(
-            { text: 'Наведите на QR клиента' },
-            (data) => {
-                if (!data) return;
-                tg.sendData(data);
-            }
-        );
-    }
+    generateQR();
+    setInterval(generateQR, QR_TTL * 1000);
 
-    function startClientQR() {
-        let timeLeft = 30;
-
-        function updateQR() {
-            const ts = Math.floor(Date.now() / 1000);
-            const hash = CryptoJS
-                .HmacSHA256(user.id + ts, SECRET_KEY)
-                .toString(CryptoJS.enc.Hex)
-                .substring(0, 10);
-
-            const qrData = JSON.stringify({
-                u: user.id,
-                t: ts,
-                s: hash
-            });
-
-            const qrDiv = document.getElementById("qrcode");
-            qrDiv.innerHTML = "";
-            new QRCode(qrDiv, {
-                text: qrData,
-                width: 200,
-                height: 200,
-                correctLevel: QRCode.CorrectLevel.L
-            });
-
-            timeLeft = 30;
+    setInterval(() => {
+        timeLeft--;
+        if (timeLeft >= 0) {
+            document.getElementById("timer").innerText =
+                "Код обновится через " + timeLeft + " сек";
         }
-
-        updateQR();
-        setInterval(updateQR, 30000);
-
-        setInterval(() => {
-            timeLeft--;
-            if (timeLeft >= 0) {
-                document.getElementById('timer').innerText =
-                    "Обновление через " + timeLeft + " сек";
-            }
-        }, 1000);
-    }
+    }, 1000);
+}
 </script>
 
 </body>
