@@ -9,63 +9,77 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; background-color: #f4f4f9; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #staff-screen, #client-screen { display: none; text-align: center; width: 90%; max-width: 350px; }
-        .big-btn { width: 220px; height: 220px; border-radius: 50%; background: #007AFF; color: white; border: none; font-size: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 8px 20px rgba(0,122,255,0.3); }
+        #staff-view, #client-view { display: none; text-align: center; width: 90%; max-width: 350px; }
+        .staff-btn { width: 220px; height: 220px; border-radius: 50%; background: #007AFF; color: white; border: none; font-size: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 8px 20px rgba(0,122,255,0.3); }
         .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         .balance { font-size: 50px; font-weight: bold; color: #28a745; margin: 10px 0; }
         #qrcode { background: white; padding: 10px; display: inline-block; margin: 15px 0; }
     </style>
 </head>
 <body>
-    <div id="staff-screen">
-        <button class="big-btn" onclick="openScanner()">📷<br>СКАНИРОВАТЬ</button>
+    <div id="staff-view">
+        <button class="staff-btn" onclick="openScanner()">📷<br>СКАНИРОВАТЬ</button>
+        <p style="margin-top:20px; opacity:0.6;">Режим сотрудника</p>
     </div>
-    <div id="client-screen" class="card">
+
+    <div id="client-view" class="card">
         <h2 id="username">Загрузка...</h2>
         <div class="balance" id="balance">0</div>
         <div id="qrcode"></div>
-        <div id="timer" style="color:#888;">Обновление...</div>
+        <div id="timer" style="color:#888; font-size:14px;">Обновление через 30 сек</div>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
         const user = tg.initDataUnsafe?.user;
-        const STAFF_IDS = [627287121]; [span_6](start_span)[span_7](start_span)// Твой ID[span_6](end_span)[span_7](end_span)
+        const STAFF_IDS = [627287121]; // Твой ID
 
         if (!user) {
-            alert("Пожалуйста, откройте приложение через Telegram"); // Твоя правка!
+            document.body.innerHTML = '<h3 style="padding:20px; text-align:center;">Пожалуйста, откройте карту через Telegram</h3>';
         } else {
-            const bal = tg.initDataUnsafe?.start_param || "0"; // Твоя правка для баланса!
-            document.getElementById('balance').innerText = bal;
+            initApp();
+        }
+
+        function initApp() {
+            const startParam = tg.initDataUnsafe?.start_param || "0";
+            document.getElementById('balance').innerText = startParam;
 
             if (STAFF_IDS.includes(user.id)) {
-                document.getElementById('staff-screen').style.display = 'block';
+                document.getElementById('staff-view').style.display = 'block';
             } else {
-                document.getElementById('client-screen').style.display = 'block';
+                document.getElementById('client-view').style.display = 'block';
                 document.getElementById('username').innerText = user.first_name;
-                startQR();
+                startLoyaltyLogic();
             }
         }
 
         function openScanner() {
-            tg.showScanQrPopup({ text: 'Сканируйте QR клиента' }, (data) => {
+            tg.showScanQrPopup({ text: 'Наведите на QR клиента' }, (data) => {
                 tg.closeScanQrPopup();
-                [span_8](start_span)tg.sendData(data); // Передаем JSON в n8n[span_8](end_span)
+                tg.sendData(data); // Отправка данных в n8n
             });
         }
 
-        function startQR() {
-            const update = () => {
+        function startLoyaltyLogic() {
+            let timeLeft = 30;
+            const updateQR = () => {
                 const ts = Math.floor(Date.now() / 1000);
                 const hash = CryptoJS.HmacSHA256(user.id + ts, "SECRET").toString().substring(0, 10);
-                [span_9](start_span)const data = JSON.stringify({ u: user.id, t: ts, s: hash });[span_9](end_span)
+                const qrData = JSON.stringify({ u: user.id, t: ts, s: hash });
+                
                 const qrDiv = document.getElementById("qrcode");
                 qrDiv.innerHTML = "";
-                new QRCode(qrDiv, { text: data, width: 180, height: 180 });
+                new QRCode(qrDiv, { text: qrData, width: 180, height: 180 });
+                timeLeft = 30;
             };
-            update();
-            [span_10](start_span)setInterval(update, 30000);[span_10](end_span)
+
+            updateQR();
+            setInterval(updateQR, 30000);
+            setInterval(() => {
+                timeLeft--;
+                if (timeLeft >= 0) document.getElementById('timer').innerText = "Обновление через " + timeLeft + " сек";
+            }, 1000);
         }
     </script>
 </body>
