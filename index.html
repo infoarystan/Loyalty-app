@@ -8,62 +8,13 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <style>
-    body { 
-        font-family: -apple-system, sans-serif; 
-        background: #f4f4f9; 
-        margin: 0; 
-        height: 100vh; 
-        display: flex; 
-        align-items: center; 
-        justify-content: center; 
-    }
-    #staff-view, #client-view { 
-        display: none; 
-        text-align: center; 
-        width: 90%; 
-        max-width: 360px; 
-    }
-    .staff-btn { 
-        width: 220px; 
-        height: 220px; 
-        border-radius: 50%; 
-        background: #007AFF; 
-        color: #fff; 
-        border: none; 
-        font-size: 20px; 
-        font-weight: bold; 
-        box-shadow: 0 8px 20px rgba(0,122,255,0.3); 
-        cursor: pointer;
-    }
-    .staff-btn:active {
-        transform: scale(0.98);
-    }
-    .card { 
-        background: #fff; 
-        padding: 25px; 
-        border-radius: 20px; 
-        box-shadow: 0 6px 20px rgba(0,0,0,.1); 
-    }
-    .balance { 
-        font-size: 52px; 
-        font-weight: bold; 
-        color: #28a745; 
-    }
-    #qrcode { 
-        margin: 20px 0; 
-        display: flex;
-        justify-content: center;
-    }
-    #qrcode img {
-        border: 8px solid white;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    #timer { 
-        color: #888; 
-        font-size: 14px; 
-        margin-top: 10px;
-    }
+    body { font-family: -apple-system, sans-serif; background: #f4f4f9; margin: 0; height: 100vh; display: flex; align-items: center; justify-content: center; }
+    #staff-view, #client-view { display: none; text-align: center; width: 90%; max-width: 360px; }
+    .staff-btn { width: 220px; height: 220px; border-radius: 50%; background: #007AFF; color: #fff; border: none; font-size: 20px; font-weight: bold; box-shadow: 0 8px 20px rgba(0,122,255,0.3); cursor: pointer; }
+    .card { background: #fff; padding: 25px; border-radius: 20px; box-shadow: 0 6px 20px rgba(0,0,0,.1); }
+    .balance { font-size: 52px; font-weight: bold; color: #28a745; margin: 10px 0; }
+    #qrcode { margin: 20px 0; display: flex; justify-content: center; }
+    #timer { color: #888; font-size: 14px; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -71,9 +22,6 @@
 <div id="staff-view">
     <button class="staff-btn" onclick="openScanner()">📷<br>СКАНИРОВАТЬ</button>
     <p style="opacity:.6">Режим сотрудника</p>
-    <p id="scan-error" style="color: red; display: none; font-size: 14px; margin-top: 10px;">
-        Сканер недоступен. Используйте камеру устройства.
-    </p>
 </div>
 
 <div id="client-view" class="card">
@@ -84,135 +32,82 @@
 </div>
 
 <script>
-const tg = window.Telegram.WebApp;
-tg.expand();
+    // Оборачиваем всё в try-catch, чтобы ПРЕДОТВРАТИТЬ белый экран при ошибке
+    try {
+        const tg = window.Telegram.WebApp;
+        tg.expand();
 
-const user = tg.initDataUnsafe?.user;
-const SECRET_KEY = "SECRET"; 
-const STAFF_IDS = [627287121]; 
-const QR_TTL = 60;
+        const user = tg.initDataUnsafe?.user;
+        const SECRET_KEY = "SECRET"; 
+        const STAFF_IDS = [627287121]; 
+        const QR_TTL = 60;
 
-if (!user) {
-    document.body.innerHTML = '<h3 style="padding:20px;text-align:center">Откройте через Telegram</h3>';
-} else {
-    initApp();
-}
-
-function initApp() {
-    const balance = tg.initDataUnsafe?.start_param || "0";
-    document.getElementById("balance").innerText = balance;
-
-    if (STAFF_IDS.includes(user.id)) {
-        document.getElementById("staff-view").style.display = "block";
-    } else {
-        document.getElementById("client-view").style.display = "block";
-        document.getElementById("username").innerText = user.first_name;
-        startQR();
-    }
-}
-
-function openScanner() {
-    // Проверяем доступность сканера
-    if (typeof tg.showScanQrPopup !== 'function') {
-        document.getElementById('scan-error').style.display = 'block';
-        alert('Сканер QR недоступен в этой версии Telegram');
-        return;
-    }
-    
-    const scanConfig = {
-        text: "Наведите на QR-код клиента"
-    };
-    
-    tg.showScanQrPopup(scanConfig, (scannedData) => {
-        if (!scannedData) {
-            console.log('Сканирование отменено или не удалось');
-            return;
+        if (!user) {
+            document.body.innerHTML = '<h3 style="padding:20px;text-align:center">Откройте через Telegram</h3>';
+        } else {
+            initApp();
         }
-        
-        console.log('Отсканировано:', scannedData);
-        
-        try {
-            // Парсим данные из QR
-            const data = JSON.parse(scannedData);
-            
-            // Отправляем данные в Telegram бот
-            tg.sendData(JSON.stringify({
-                type: 'scan_result',
-                data: data,
-                timestamp: Date.now(),
-                scannerId: user.id
-            }));
-            
-            // Можно показать уведомление об успехе
-            tg.showAlert('QR-код успешно отсканирован!');
-            
-        } catch (error) {
-            console.error('Ошибка обработки QR:', error);
-            tg.showAlert('Ошибка обработки QR-кода');
+
+        function initApp() {
+            const balance = tg.initDataUnsafe?.start_param || "0";
+            document.getElementById("balance").innerText = balance;
+
+            if (STAFF_IDS.includes(user.id)) {
+                document.getElementById("staff-view").style.display = "block";
+            } else {
+                document.getElementById("client-view").style.display = "block";
+                document.getElementById("username").innerText = user.first_name;
+                startQR();
+            }
         }
-    });
-}
 
-function startQR() {
-    let timeLeft = QR_TTL;
-    let qrCodeInstance = null;
+        function openScanner() {
+            tg.showScanQrPopup({ text: "Наведите на QR-код клиента" }, (scannedData) => {
+                if (!scannedData) return;
+                
+                // Просто отправляем "сырые" данные боту. 
+                // n8n сам разберется, JSON это или нет. Так надежнее!
+                tg.sendData(scannedData); 
+                
+                [span_8](start_span)// ВАЖНО: После sendData ничего не пишем, приложение закроется.[span_8](end_span)
+            });
+        }
 
-    function generateQR() {
-        const ts = Math.floor(Date.now() / 1000);
-        const nonce = Math.random().toString(36).substring(2, 10);
-        const sign = CryptoJS.HmacSHA256(
-            user.id + ts + nonce, 
-            SECRET_KEY
-        ).toString(CryptoJS.enc.Hex).substring(0, 12);
+        function startQR() {
+            let timeLeft = QR_TTL;
 
-        // Создаем компактный payload
-        const payload = JSON.stringify({
-            uid: user.id,
-            ts: ts,
-            n: nonce,
-            s: sign
-        });
+            function generateQR() {
+                const ts = Math.floor(Date.now() / 1000);
+                const nonce = Math.random().toString(36).substring(2, 10);
+                const sign = CryptoJS.HmacSHA256(user.id + ts + nonce, SECRET_KEY).toString(CryptoJS.enc.Hex).substring(0, 12);
 
-        const qrDiv = document.getElementById("qrcode");
-        
-        // Очищаем предыдущий QR
-        qrDiv.innerHTML = "";
-        
-        // Создаем новый QR с настройками для лучшего сканирования
-        qrCodeInstance = new QRCode(qrDiv, {
-            text: payload,
-            width: 220,
-            height: 220,
-            correctLevel: QRCode.CorrectLevel.M,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            useSVG: false
-        });
-        
-        timeLeft = QR_TTL;
-        
-        console.log('Сгенерирован QR с данными:', payload);
+                const payload = JSON.stringify({u: user.id, t: ts, n: nonce, s: sign});
+
+                const qrDiv = document.getElementById("qrcode");
+                qrDiv.innerHTML = "";
+                
+                new QRCode(qrDiv, {
+                    text: payload,
+                    width: 220,
+                    height: 220,
+                    correctLevel: QRCode.CorrectLevel.M
+                });
+                timeLeft = QR_TTL;
+            }
+
+            generateQR();
+            setInterval(generateQR, QR_TTL * 1000);
+            setInterval(() => {
+                timeLeft--;
+                if (timeLeft >= 0) {
+                    document.getElementById("timer").innerText = Код обновится через ${timeLeft} сек;
+                }
+            }, 1000);
+        }
+    } catch (e) {
+        // Если случится любая ошибка, мы увидим её текст, а не белый экран
+        document.body.innerHTML = '<div style="color:red; padding:20px;">Ошибка запуска: ' + e.message + '</div>';
     }
-
-    // Генерация сразу и по интервалу
-    generateQR();
-    
-    const qrInterval = setInterval(generateQR, QR_TTL * 1000);
-    
-    const timerInterval = setInterval(() => {
-        timeLeft--;
-        if (timeLeft >= 0) {
-            document.getElementById("timer").innerText = 
-                Код обновится через ${timeLeft} сек;
-        }
-    }, 1000);
-    
-    // Очистка интервалов при размонтировании
-    window.addEventListener('beforeunload', () => {
-        clearInterval(qrInterval);
-        clearInterval(timerInterval);
-    });
-}
 </script>
 </body>
 </html>
