@@ -3,132 +3,120 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Loyalty App</title>
+    <title>Loyalty</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        .container { width: 100%; display: flex; flex-direction: column; align-items: center; }
+        body { font-family: -apple-system, sans-serif; background-color: #fff; color: #000; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
         
-        /* КЛИЕНТ (Виден сразу, чтобы не было пустоты) */
-        #client-view { text-align: center; width: 85%; max-width: 320px; background: var(--tg-theme-secondary-bg-color, #f0f0f0); padding: 20px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); display: block; }
-        .balance { font-size: 48px; font-weight: 800; color: #34C759; margin: 15px 0; }
-        #qrcode { margin: 20px auto; background: white; padding: 15px; border-radius: 15px; display: inline-block; }
-        #timer { font-size: 14px; opacity: 0.6; margin-top: 10px; font-variant-numeric: tabular-nums; }
-
-        /* КАССИР (Скрыт, пока не проверим ID) */
-        #staff-view { width: 100%; height: 100vh; display: none; flex-direction: column; align-items: center; justify-content: center; background-color: var(--tg-theme-bg-color, #fff); position: absolute; top: 0; left: 0; z-index: 10; }
-        .staff-btn { width: 250px; height: 250px; border-radius: 50%; background: linear-gradient(135deg, #007AFF, #0056b3); color: white; border: none; font-size: 24px; font-weight: bold; cursor: pointer; box-shadow: 0 10px 30px rgba(0,122,255,0.4); display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        .staff-icon { font-size: 60px; margin-bottom: 10px; }
+        /* Стили для Кассира */
+        #staff-screen { display: none; text-align: center; }
+        .big-btn { width: 200px; height: 200px; border-radius: 50%; background: #007AFF; color: white; border: none; font-size: 20px; font-weight: bold; box-shadow: 0 10px 20px rgba(0,0,0,0.2); cursor: pointer; }
         
-        /* Блок для ошибок (если вдруг что-то сломается) */
-        #error-log { color: red; font-size: 12px; margin-top: 20px; text-align: center; white-space: pre-wrap; display: none;}
+        /* Стили для Клиента */
+        #client-screen { display: none; text-align: center; width: 85%; max-width: 320px; background: #f2f2f7; padding: 20px; border-radius: 20px; }
+        .balance { font-size: 48px; font-weight: 800; color: #34C759; margin: 10px 0; }
+        #qrcode { background: white; padding: 10px; border-radius: 10px; display: inline-block; margin: 15px 0; }
+        #qrcode img { display: block; } /* Фикс для белой точки */
+        
+        /* Диагностика (чтобы ты видела свой ID) */
+        #debug-info { position: absolute; bottom: 10px; font-size: 10px; color: #ccc; }
     </style>
 </head>
 <body>
 
-    <div id="error-log"></div>
-
-    <div class="container">
-        <div id="client-view">
-            <h2 id="username">Гость</h2>
-            <div style="opacity: 0.7; font-size: 14px;">Ваши баллы:</div>
-            <div class="balance" id="balance">0</div>
-            <div id="qrcode"></div>
-            <div id="timer">Загрузка...</div>
-        </div>
-
-        <div id="staff-view">
-            <button class="staff-btn" onclick="openScanner()">
-                <div class="staff-icon">📷</div>
-                СКАНИРОВАТЬ
-            </button>
-            <div style="margin-top:20px; opacity:0.5;">Режим сотрудника</div>
-        </div>
+    <div id="staff-screen">
+        <button class="big-btn" onclick="openScanner()">📷<br>СКАНИРОВАТЬ</button>
+        <p style="margin-top:20px; color:#888;">Режим персонала</p>
     </div>
 
-    <script>
-        // Функция для вывода ошибок на экран (чтобы ты видела, в чем дело)
-        window.onerror = function(msg, url, line) {
-            const errDiv = document.getElementById('error-log');
-            errDiv.style.display = 'block';
-            errDiv.innerHTML += Ошибка: ${msg}<br>Строка: ${line}<br>;
-            return false;
-        };
+    <div id="client-screen">
+        <h2 id="username">Гость</h2>
+        <div>Ваши баллы:</div>
+        <div class="balance" id="balance">0</div>
+        <div id="qrcode"></div>
+        <div id="timer" style="color:#888; font-size:13px;">Загрузка...</div>
+    </div>
 
+    <div id="debug-info">ID: ...</div>
+
+    <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
+        
+        // --- НАСТРОЙКИ ---
+        const SECRET_KEY = "MY_SUPER_SECRET_KEY";
+        const STAFF_IDS = [ 627287121 ]; // Твой ID
+
+        // Получаем данные
         const user = tg.initDataUnsafe.user;
-        const SECRET_KEY = "MY_SUPER_SECRET_KEY"; 
+        const urlParams = new URLSearchParams(window.location.search);
+        
+        // Показываем ID для проверки (внизу экрана)
+        const currentId = user ? user.id : "Не определен";
+        document.getElementById('debug-info').innerText = "Мой ID: " + currentId;
 
-        // !!! ТВОЙ СПИСОК ID !!!
-        const STAFF_IDS = [ 627287121 ]; 
-
-        // --- ЛОГИКА ПЕРЕКЛЮЧЕНИЯ ---
-        // Проверяем: это кассир?
-        try {
-            if (user && STAFF_IDS.includes(user.id)) {
-                // Если Кассир -> Показываем кнопку, скрываем клиента
-                document.getElementById('staff-view').style.display = 'flex';
-                document.getElementById('client-view').style.display = 'none';
-            } else {
-                // Если Клиент -> Запускаем QR
-                startClientLogic();
-            }
-        } catch (e) {
-            // Если ошибка в логике - просто запускаем клиента как запасной вариант
-            console.error(e);
-            startClientLogic();
+        // --- ГЛАВНАЯ ПРОВЕРКА ---
+        if (user && STAFF_IDS.includes(user.id)) {
+            // ЭТО КАССИР
+            document.getElementById('staff-screen').style.display = 'block';
+        } else {
+            // ЭТО КЛИЕНТ (или ID не совпал)
+            showClientScreen();
         }
 
         // --- ФУНКЦИИ ---
         function openScanner() {
             tg.showScanQrPopup({ text: 'Наведите на QR клиента' }, (data) => {
                 tg.closeScanQrPopup();
-                tg.sendData(data); 
+                tg.sendData(data);
             });
         }
 
-        function startClientLogic() {
+        function showClientScreen() {
+            document.getElementById('client-screen').style.display = 'block';
+            
+            // Заполняем имя и баланс
             if (user) document.getElementById('username').innerText = user.first_name;
-            
-            const urlParams = new URLSearchParams(window.location.search);
-            const balanceVal = urlParams.get('balance');
-            if(balanceVal) document.getElementById('balance').innerText = balanceVal;
+            const bal = urlParams.get('balance');
+            if(bal) document.getElementById('balance').innerText = bal;
 
-            let timeLeft = 30;
-            
-            function generateQR() {
-                const userId = user ? user.id.toString() : "DEMO";
-                const timestamp = Math.floor(Date.now() / 1000);
-                const dataToSign = userId + timestamp;
-                
-                // Проверка: загрузилась ли библиотека шифрования?
-                let hash = "error";
-                if (typeof CryptoJS !== 'undefined') {
-                    hash = CryptoJS.HmacSHA256(dataToSign, SECRET_KEY).toString(CryptoJS.enc.Hex);
-                } else {
-                    document.getElementById('error-log').innerText += "Библиотека crypto-js не загрузилась!\n";
-                }
-                
-                const qrData = JSON.stringify({ u: userId, t: timestamp, s: hash.substring(0, 10) });
-
-                const qrDiv = document.getElementById("qrcode");
-                qrDiv.innerHTML = "";
-                new QRCode(qrDiv, { text: qrData, width: 200, height: 200, correctLevel : QRCode.CorrectLevel.H });
-                
-                timeLeft = 30;
-                document.getElementById('timer').innerText = Код обновится через ${timeLeft} сек;
-            }
-
+            // Запускаем генерацию QR
             generateQR();
+            setInterval(generateQR, 30000); // Обновление каждые 30 сек
+            
+            // Таймер обратного отсчета
+            let timeLeft = 30;
             setInterval(() => {
                 timeLeft--;
-                if (timeLeft < 0) { generateQR(); }
-                else { document.getElementById('timer').innerText = Код обновится через ${timeLeft} сек; }
+                if(timeLeft < 0) timeLeft = 30;
+                document.getElementById('timer').innerText = Код обновится через ${timeLeft} сек;
             }, 1000);
+        }
+
+        function generateQR() {
+            const userId = user ? user.id.toString() : "DEMO";
+            const timestamp = Math.floor(Date.now() / 1000);
+            
+            // Защита: если crypto-js не прогрузился
+            let hash = "no-crypto";
+            if (typeof CryptoJS !== 'undefined') {
+                hash = CryptoJS.HmacSHA256(userId + timestamp, SECRET_KEY).toString(CryptoJS.enc.Hex);
+            }
+
+            const qrData = JSON.stringify({ u: userId, t: timestamp, s: hash.substring(0, 10) });
+
+            // Очищаем и рисуем заново
+            const qrDiv = document.getElementById("qrcode");
+            qrDiv.innerHTML = "";
+            new QRCode(qrDiv, {
+                text: qrData,
+                width: 180,
+                height: 180,
+                correctLevel: QRCode.CorrectLevel.L // Легкий уровень (быстрее рисуется)
+            });
         }
     </script>
 </body>
