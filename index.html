@@ -3,76 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Моя Карта</title>
+    <title>Loyalty App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-        }
-        .card {
-            background: var(--tg-theme-secondary-bg-color, #f0f0f0);
-            padding: 20px;
-            border-radius: 15px;
-            text-align: center;
-            width: 80%;
-            max-width: 300px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-        }
-        h1 { margin: 0 0 10px; font-size: 24px; }
+        body { font-family: sans-serif; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background: var(--tg-theme-secondary-bg-color, #f0f0f0); padding: 20px; border-radius: 15px; text-align: center; width: 85%; max-width: 320px; }
         .balance { font-size: 42px; font-weight: bold; color: #34C759; margin: 10px 0; }
-        #qrcode { margin: 20px auto; background: white; padding: 10px; border-radius: 10px; }
-        .hint { font-size: 12px; opacity: 0.7; margin-top: 15px; }
+        #qrcode { margin: 20px auto; background: white; padding: 10px; border-radius: 10px; display: inline-block; }
+        #timer { font-size: 12px; opacity: 0.5; margin-top: 5px; }
+        
+        /* Кнопка для кассира */
+        .staff-btn { margin-top: 30px; padding: 10px 20px; background: transparent; border: 1px solid var(--tg-theme-hint-color, #999); color: var(--tg-theme-hint-color, #999); border-radius: 8px; font-size: 14px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div class="card">
-        <h1 id="username">Гость</h1>
-        <div>Ваш баланс:</div>
+    <div class="card" id="user-view">
+        <h2 id="username">Загрузка...</h2>
+        <div>Ваши баллы:</div>
         <div class="balance" id="balance">...</div>
         
         <div id="qrcode"></div>
+        <div id="timer">Обновление через 30 сек</div>
         
-        <p class="hint">Покажите этот QR-код кассиру для начисления баллов</p>
+        <button class="staff-btn" onclick="switchMode()">Я сотрудник 👮‍♂️</button>
     </div>
 
     <script>
-        // Инициализация Telegram
         const tg = window.Telegram.WebApp;
-        tg.expand(); // На весь экран
-
-        // Данные пользователя из Телеграм
+        tg.expand();
         const user = tg.initDataUnsafe.user;
+
+        // --- НАСТРОЙКИ ---
+        // Секретный ключ (должен совпадать с тем, что будет в n8n)
+        const SECRET_KEY = "MY_SUPER_SECRET_KEY"; 
+
+        // 1. Отображение данных
+        if (user) document.getElementById('username').innerText = user.first_name;
         
-        // 1. Показываем имя
-        if (user) {
-            document.getElementById('username').innerText = user.first_name;
+        // Читаем баланс из ссылки
+        const urlParams = new URLSearchParams(window.location.search);
+        document.getElementById('balance').innerText = urlParams.get('balance') || "0";
+
+        // 2. ГЕНЕРАЦИЯ ДИНАМИЧЕСКОГО QR (Глава 8.1)
+        function generateSecureQR() {
+            const userId = user ? user.id.toString() : "DEMO";
+            const timestamp = Math.floor(Date.now() / 1000); // Текущее время
+            
+            // Создаем подпись: UserID + Время + Секрет
+            const dataToSign = userId + timestamp;
+            const hash = CryptoJS.HmacSHA256(dataToSign, SECRET_KEY).toString(CryptoJS.enc.Hex);
+            
+            // Формат JSON для сканера: u=user, t=time, s=signature
+            const qrData = JSON.stringify({
+                u: userId,
+                t: timestamp,
+                s: hash.substring(0, 10) // Берем первые 10 символов хеша для краткости
+            });
+
+            // Рисуем QR
+            document.getElementById("qrcode").innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), {
+                text: qrData,
+                width: 180, height: 180
+            });
+            
+            console.log("QR обновлен", timestamp);
         }
 
-        // 2. Генерируем QR-код (User ID)
-        // В будущем добавим сюда защиту (время + подпись), как в инструкции
-        const qrData = user ? user.id.toString() : "DEMO_USER";
-        new QRCode(document.getElementById("qrcode"), {
-            text: qrData,
-            width: 180,
-            height: 180
-        });
+        // Запускаем генерацию сразу и потом каждые 30 секунд
+        generateSecureQR();
+        setInterval(generateSecureQR, 30000); // 30000 мс = 30 сек
 
-        // 3. Запрашиваем баланс (Заглушка, скоро подключим n8n)
-        // Пока просто покажем 0, чтобы проверить визуал
-        // Читаем баланс из ссылки (URL)
-        const urlParams = new URLSearchParams(window.location.search);
-        const balance = urlParams.get('balance') || "0";
-        document.getElementById('balance').innerText = balance;
+        // 3. РЕЖИМ КАССИРА (Глава 8.2)
+        function switchMode() {
+            // Вызываем нативный сканер Телеграма
+            tg.showScanQrPopup({
+                text: 'Наведите камеру на QR-код клиента'
+            }, (data) => {
+                // Когда сканер что-то увидел:
+                // data - это текст из QR кода (наш JSON)
+                
+                // Закрываем сканер (true)
+                tg.closeScanQrPopup();
+                
+                // Отправляем данные боту (в n8n)
+                // Мы отправляем это как "системное сообщение" от имени кассира
+                tg.sendData(data); 
+            });
+        }
 
     </script>
 </body>
