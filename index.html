@@ -4,101 +4,156 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Loyalty App</title>
+
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
     <style>
-        body { font-family: -apple-system, sans-serif; background-color: #f4f4f9; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #staff-view, #client-view { display: none; text-align: center; width: 90%; max-width: 350px; }
-        .staff-btn { width: 220px; height: 220px; border-radius: 50%; background: #007AFF; color: white; border: none; font-size: 20px; font-weight: bold; cursor: pointer; box-shadow: 0 8px 20px rgba(0,122,255,0.3); }
-        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .balance { font-size: 50px; font-weight: bold; color: #28a745; margin: 10px 0; }
-        #qrcode { background: white; padding: 10px; display: inline-block; margin: 15px 0; }
+        body {
+            font-family: -apple-system, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        #staff-view, #client-view {
+            display: none;
+            text-align: center;
+            width: 90%;
+            max-width: 350px;
+        }
+
+        .staff-btn {
+            width: 220px;
+            height: 220px;
+            border-radius: 50%;
+            background: #007AFF;
+            color: #fff;
+            border: none;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .card {
+            background: #fff;
+            padding: 25px;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,.1);
+        }
+
+        .balance {
+            font-size: 50px;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        #qrcode {
+            margin: 15px 0;
+        }
+
+        #timer {
+            color: #888;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
-    <div id="staff-view">
-        <button class="staff-btn" onclick="openScanner()">📷<br>СКАНИРОВАТЬ</button>
-        <p style="margin-top:20px; opacity:0.6;">Режим сотрудника</p>
-    </div>
 
-    <div id="client-view" class="card">
-        <h2 id="username">Загрузка...</h2>
-        <div class="balance" id="balance">0</div>
-        <div id="qrcode"></div>
-        <div id="timer" style="color:#888; font-size:14px;">Обновление через 30 сек</div>
-    </div>
+<div id="staff-view">
+    <button class="staff-btn" onclick="openScanner()">📷<br>СКАНИРОВАТЬ</button>
+    <p style="opacity:.6">Режим сотрудника</p>
+</div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        const user = tg.initDataUnsafe?.user;
-        const SECRET_KEY = "SECRET"; // Должен совпадать в приложении и n8n
-        const STAFF_IDS = [627287121]; // Твой ID
+<div id="client-view" class="card">
+    <h2 id="username">Загрузка...</h2>
+    <div class="balance" id="balance">0</div>
+    <div id="qrcode"></div>
+    <div id="timer">Обновление через 30 сек</div>
+</div>
 
-        if (!user) {
-            document.body.innerHTML = '<h3 style="padding:20px; text-align:center;">Пожалуйста, откройте карту через Telegram</h3>';
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const user = tg.initDataUnsafe?.user;
+    const SECRET_KEY = "SECRET";
+    const STAFF_IDS = [627287121];
+
+    if (!user) {
+        document.body.innerHTML =
+            '<h3 style="padding:20px;text-align:center">Откройте приложение через Telegram</h3>';
+    } else {
+        initApp();
+    }
+
+    function initApp() {
+        const balance = tg.initDataUnsafe?.start_param || "0";
+        document.getElementById('balance').innerText = balance;
+
+        if (STAFF_IDS.includes(user.id)) {
+            document.getElementById('staff-view').style.display = 'block';
         } else {
-            initApp();
+            document.getElementById('client-view').style.display = 'block';
+            document.getElementById('username').innerText = user.first_name;
+            startClientQR();
         }
+    }
 
-        function initApp() {
-            // Баланс из start_param (твоя правка)
-            const startParam = tg.initDataUnsafe?.start_param || "0";
-            document.getElementById('balance').innerText = startParam;
-
-            if (STAFF_IDS.includes(user.id)) {
-                document.getElementById('staff-view').style.display = 'block';
-            } else {
-                document.getElementById('client-screen' || 'client-view').style.display = 'block';
-                document.getElementById('username').innerText = user.first_name;
-                startLoyaltyLogic();
+    function openScanner() {
+        tg.showScanQrPopup(
+            { text: 'Наведите на QR клиента' },
+            (data) => {
+                if (!data) return;
+                tg.sendData(data);
             }
+        );
+    }
+
+    function startClientQR() {
+        let timeLeft = 30;
+
+        function updateQR() {
+            const ts = Math.floor(Date.now() / 1000);
+            const hash = CryptoJS
+                .HmacSHA256(user.id + ts, SECRET_KEY)
+                .toString(CryptoJS.enc.Hex)
+                .substring(0, 10);
+
+            const qrData = JSON.stringify({
+                u: user.id,
+                t: ts,
+                s: hash
+            });
+
+            const qrDiv = document.getElementById("qrcode");
+            qrDiv.innerHTML = "";
+            new QRCode(qrDiv, {
+                text: qrData,
+                width: 200,
+                height: 200,
+                correctLevel: QRCode.CorrectLevel.L
+            });
+
+            timeLeft = 30;
         }
 
-        // ПРАВИЛЬНАЯ РЕАЛИЗАЦИЯ СКАНЕРА (согласно вложению)
-        function openScanner() {
-            tg.showScanQrPopup(
-                { text: 'Наведите на QR клиента' },
-                (data) => {
-                    if (!data) return;
-                    // Telegram сам закроет попап, но мы можем подстраховаться
-                    tg.closeScanQrPopup();
-                    tg.sendData(data); // Отправка данных боту
-                }
-            );
-        }
+        updateQR();
+        setInterval(updateQR, 30000);
 
-        function startLoyaltyLogic() {
-            let timeLeft = 30;
-            const updateQR = () => {
-                const ts = Math.floor(Date.now() / 1000);
-                // HMAC-подпись согласно Главе 8.1
-                const hash = CryptoJS.HmacSHA256(user.id + ts, SECRET_KEY).toString(CryptoJS.enc.Hex).substring(0, 10);
-                
-                [span_7](start_span)// Компактный JSON без пробелов для быстрого считывания[span_7](end_span)
-                const qrData = JSON.stringify({u:user.id,t:ts,s:hash});
-                
-                const qrDiv = document.getElementById("qrcode");
-                qrDiv.innerHTML = "";
-                new QRCode(qrDiv, { 
-                    text: qrData, 
-                    width: 200, 
-                    height: 200, 
-                    [span_8](start_span)correctLevel: QRCode.CorrectLevel.L // Уровень L для быстроты[span_8](end_span)
-                });
-                timeLeft = 30;
-            };
+        setInterval(() => {
+            timeLeft--;
+            if (timeLeft >= 0) {
+                document.getElementById('timer').innerText =
+                    "Обновление через " + timeLeft + " сек";
+            }
+        }, 1000);
+    }
+</script>
 
-            updateQR();
-            setInterval(updateQR, 30000);
-            setInterval(() => {
-                timeLeft--;
-                if (timeLeft >= 0) {
-                    document.getElementById('timer').innerText = "Обновление через " + timeLeft + " сек";
-                }
-            }, 1000);
-        }
-    </script>
 </body>
 </html>
