@@ -1,617 +1,276 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Loyalty System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loyalty App</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            font-family: -apple-system, sans-serif;
+            background: #f0f2f5;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
         }
-
-        .container {
-            width: 100%;
-            max-width: 400px;
+        
+        .screen {
+            display: none;
         }
-
-        .card {
+        
+        .screen.active {
+            display: block;
+        }
+        
+        .client-view {
             background: white;
-            border-radius: 20px;
-            padding: 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-            text-align: center;
-            margin-bottom: 20px;
-            animation: slideUp 0.5s ease;
-        }
-
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .staff-card {
-            background: white;
-            border-radius: 20px;
-            padding: 40px 30px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-            text-align: center;
-        }
-
-        .user-name {
-            font-size: 24px;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 15px;
-        }
-
-        .balance-title {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 5px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .balance-amount {
-            font-size: 56px;
-            font-weight: 700;
-            color: #28a745;
-            margin-bottom: 30px;
-            text-shadow: 0 2px 4px rgba(40, 167, 69, 0.2);
-        }
-
-        .qr-container {
-            background: #f8f9fa;
-            padding: 20px;
             border-radius: 16px;
-            margin: 25px 0;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .staff-view {
+            text-align: center;
+            padding-top: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin: 0 0 8px 0;
+            font-size: 20px;
+        }
+        
+        .balance {
+            color: #28a745;
+            font-size: 48px;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+        
+        #qrcode {
+            margin: 20px auto;
+            padding: 16px;
+            background: white;
+            border-radius: 12px;
             display: inline-block;
-            border: 2px solid #e9ecef;
         }
-
+        
         .timer {
-            font-size: 14px;
             color: #666;
-            margin-top: 15px;
-            font-weight: 500;
+            font-size: 14px;
+            margin-top: 12px;
         }
-
-        .staff-btn {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        
+        .scan-btn {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            background: #007AFF;
             color: white;
             border: none;
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            font-size: 20px;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 10px 40px rgba(102, 126, 234, 0.4);
-            transition: all 0.3s ease;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto;
-        }
-
-        .staff-btn:active {
-            transform: scale(0.95);
-            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.6);
-        }
-
-        .staff-label {
-            margin-top: 20px;
-            color: white;
-            font-size: 16px;
-            opacity: 0.9;
-            font-weight: 500;
-        }
-
-        .loading {
-            color: white;
             font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 20px auto;
+            display: block;
+        }
+        
+        .loading {
             text-align: center;
-            padding: 50px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .loader {
-            width: 50px;
-            height: 50px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: white;
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .error {
-            background: white;
-            padding: 30px;
-            border-radius: 20px;
-            text-align: center;
-            color: #dc3545;
-        }
-
-        .points-badge {
-            display: inline-block;
-            background: #28a745;
-            color: white;
-            padding: 8px 20px;
-            border-radius: 20px;
-            font-size: 14px;
-            font-weight: 600;
-            margin-top: 10px;
-        }
-
-        .info-text {
-            font-size: 13px;
+            padding: 40px;
             color: #666;
-            line-height: 1.6;
-            margin-top: 25px;
-            padding: 15px;
-            background: #f8f9fa;
-            border-radius: 10px;
-        }
-
-        .emoji {
-            font-size: 40px;
-            margin-bottom: 10px;
-        }
-
-        .version {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            color: rgba(255,255,255,0.5);
-            font-size: 12px;
-        }
-
-        /* Адаптивность для маленьких экранов */
-        @media (max-width: 480px) {
-            .card, .staff-card {
-                padding: 20px;
-                margin: 10px;
-            }
-            
-            .balance-amount {
-                font-size: 48px;
-            }
-            
-            .staff-btn {
-                width: 180px;
-                height: 180px;
-                font-size: 18px;
-            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Состояние загрузки -->
-        <div id="loading" class="loading">
-            <div class="loader"></div>
-            <div>Загрузка системы лояльности...</div>
+    <div id="loading" class="loading">Загрузка...</div>
+    
+    <div id="clientScreen" class="screen">
+        <div class="client-view">
+            <h1 id="clientName">Клиент</h1>
+            <div class="balance" id="clientBalance">0</div>
+            <div>Ваш QR-код:</div>
+            <div id="qrcode"></div>
+            <div class="timer" id="timer">Обновление через 60 сек</div>
         </div>
-
-        <!-- Режим сотрудника (скрыт по умолчанию) -->
-        <div id="staff-view" class="staff-card" style="display: none;">
-            <div class="emoji">👨‍💼</div>
-            <h2 style="margin-bottom: 30px; color: #333;">Режим сотрудника</h2>
-            
-            <button class="staff-btn" id="scan-btn" onclick="openScanner()">
-                📷<br>
-                <span style="font-size: 18px;">СКАНИРОВАТЬ</span><br>
-                <span style="font-size: 14px; opacity: 0.9;">QR-код клиента</span>
-            </button>
-            
-            <div class="staff-label">
-                ID сотрудника: <span id="staff-id">-</span>
-            </div>
-            
-            <div id="scan-result" style="margin-top: 30px; display: none;">
-                <div class="points-badge" id="scan-user">Клиент</div>
-                <div id="scan-balance" style="margin-top: 15px;"></div>
-            </div>
-            
-            <div class="info-text">
-                Для начисления баллов отсканируйте QR-код клиента и введите сумму чека
-            </div>
-        </div>
-
-        <!-- Режим клиента (скрыт по умолчанию) -->
-        <div id="client-view" class="card" style="display: none;">
-            <div class="emoji">👤</div>
-            <div class="user-name" id="user-name">Гость</div>
-            
-            <div class="balance-title">Ваш баланс баллов</div>
-            <div class="balance-amount" id="balance">0</div>
-            
-            <div class="balance-title">Ваш QR-код для покупок</div>
-            <div class="qr-container">
-                <div id="qrcode"></div>
-            </div>
-            <div class="timer" id="timer">QR-код обновится через 60 секунд</div>
-            
-            <div class="info-text">
-                <strong>📱 Как использовать:</strong><br>
-                1. Покажите этот QR-код кассиру<br>
-                2. Кассир отсканирует код<br>
-                3. Баллы начислятся автоматически<br>
-                ⚡️ Код обновляется каждые 60 секунд
-            </div>
-        </div>
-
-        <!-- Состояние ошибки (скрыто по умолчанию) -->
-        <div id="error-view" class="error" style="display: none;">
-            <div class="emoji">⚠️</div>
-            <h3 style="margin-bottom: 15px;">Ошибка загрузки</h3>
-            <p>Пожалуйста, откройте это приложение через Telegram бот</p>
-            <button onclick="location.reload()" 
-                    style="margin-top: 20px; padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 10px; cursor: pointer;">
-                Обновить страницу
-            </button>
-        </div>
-
-        <!-- Тестовый режим (только для разработки) -->
-        <div id="test-view" class="card" style="display: none;">
-            <div class="emoji">🔧</div>
-            <h2 style="margin-bottom: 20px; color: #333;">Тестовый режим</h2>
-            <p style="margin-bottom: 20px; color: #666;">Telegram Web App не обнаружен. Включен тестовый режим.</p>
-            
-            <div style="display: flex; gap: 10px; justify-content: center; margin-bottom: 30px;">
-                <button onclick="switchToClient()" 
-                        style="padding: 12px 24px; background: #28a745; color: white; border: none; border-radius: 10px; cursor: pointer;">
-                    👤 Режим клиента
-                </button>
-                <button onclick="switchToStaff()" 
-                        style="padding: 12px 24px; background: #007bff; color: white; border: none; border-radius: 10px; cursor: pointer;">
-                    👨‍💼 Режим сотрудника
-                </button>
-            </div>
-            
-            <div class="info-text">
-                <strong>Для работы в Telegram:</strong><br>
-                1. Создайте бота через @BotFather<br>
-                2. Добавьте мини-приложение в бота<br>
-                3. Откройте приложение через бота
-            </div>
+    </div>
+    
+    <div id="staffScreen" class="screen">
+        <div class="staff-view">
+            <button class="scan-btn" onclick="scanQR()">📷<br>СКАНИРОВАТЬ</button>
+            <p>Режим сотрудника</p>
         </div>
     </div>
 
-    <div class="version">v1.0.2</div>
+<script>
+// ===== КОНФИГУРАЦИЯ =====
+const STAFF_IDS = [627287121, 123456789]; // Добавьте сюда ID сотрудников через запятую
+const QR_LIFETIME = 60; // секунд
 
-    <script>
-        // ============= ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И КОНСТАНТЫ =============
-        const STAFF_IDS = [627287121]; // ID сотрудников (замените на свои)
-        const SECRET_KEY = "loyalty-secret-2024"; // Ключ для подписи QR
-        const QR_TTL = 60; // Время жизни QR в секундах
-        let tg = null;
-        let currentUser = null;
-        let qrCodeInstance = null;
-        let qrTimer = null;
-        let countdownTimer = null;
+// ===== ОСНОВНОЙ КОД =====
+let tg = window.Telegram.WebApp;
+let isStaff = false;
+let qrTimer = null;
 
-        // ============= ОСНОВНАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ =============
-        function initApp() {
-            console.log('=== ИНИЦИАЛИЗАЦИЯ ПРИЛОЖЕНИЯ ===');
+// Инициализация
+function init() {
+    console.log("Инициализация приложения");
+    
+    if (!tg) {
+        showError("Откройте в Telegram");
+        return;
+    }
+    
+    tg.expand();
+    tg.ready();
+    
+    const user = tg.initDataUnsafe?.user;
+    
+    if (!user) {
+        showError("Не удалось получить данные");
+        return;
+    }
+    
+    console.log("Пользователь:", user.id);
+    
+    // Проверяем, является ли сотрудником
+    isStaff = STAFF_IDS.includes(parseInt(user.id));
+    
+    // Скрываем загрузку
+    document.getElementById('loading').style.display = 'none';
+    
+    if (isStaff) {
+        // Режим сотрудника
+        document.getElementById('staffScreen').classList.add('active');
+        console.log("Загружен режим СОТРУДНИКА");
+    } else {
+        // Режим клиента
+        document.getElementById('clientScreen').classList.add('active');
+        document.getElementById('clientName').textContent = user.first_name || "Клиент";
+        
+        // Получаем баланс из параметров запуска
+        const balance = tg.initDataUnsafe?.start_param || "0";
+        document.getElementById('clientBalance').textContent = balance;
+        
+        // Запускаем генерацию QR
+        generateQR(user.id);
+        console.log("Загружен режим КЛИЕНТА");
+    }
+}
+
+// Генерация QR-кода
+function generateQR(userId) {
+    function updateQR() {
+        const timestamp = Math.floor(Date.now() / 1000);
+        const data = LOYALTY:${userId}:${timestamp};
+        
+        const qr = qrcode(0, 'M');
+        qr.addData(data);
+        qr.make();
+        
+        document.getElementById('qrcode').innerHTML = qr.createImgTag(6, 0);
+        
+        // Запускаем таймер
+        startTimer();
+    }
+    
+    function startTimer() {
+        let timeLeft = QR_LIFETIME;
+        
+        function updateTimer() {
+            document.getElementById('timer').textContent = 
+                Обновление через ${timeLeft} сек;
+            timeLeft--;
             
-            try {
-                // Пытаемся получить Telegram Web App
-                tg = window.Telegram?.WebApp;
-                
-                if (!tg) {
-                    console.log('Telegram Web App не найден, включаем тестовый режим');
-                    showTestView();
-                    return;
-                }
-                
-                console.log('Telegram Web App обнаружен, версия:', tg.version);
-                
-                // Уведомляем Telegram о готовности
-                tg.ready();
-                
-                // Расширяем на весь экран
-                tg.expand();
-                
-                // Получаем данные пользователя
-                currentUser = tg.initDataUnsafe?.user;
-                
-                if (!currentUser) {
-                    console.log('Данные пользователя не получены');
-                    showError('Не удалось получить данные пользователя');
-                    return;
-                }
-                
-                console.log('Пользователь:', currentUser);
-                
-                // Получаем баланс из параметров запуска
-                const balance = tg.initDataUnsafe?.start_param || "150";
-                
-                // Скрываем экран загрузки
-                hideLoading();
-                
-                // Определяем режим работы
-                if (STAFF_IDS.includes(parseInt(currentUser.id))) {
-                    console.log('Загружается режим СОТРУДНИКА');
-                    showStaffMode(currentUser, balance);
-                } else {
-                    console.log('Загружается режим КЛИЕНТА');
-                    showClientMode(currentUser, balance);
-                }
-                
-            } catch (error) {
-                console.error('Критическая ошибка инициализации:', error);
-                showError('Ошибка загрузки приложения: ' + error.message);
+            if (timeLeft < 0) {
+                updateQR();
             }
         }
+        
+        // Очищаем старый таймер
+        if (qrTimer) clearInterval(qrTimer);
+        
+        // Запускаем новый
+        updateTimer();
+        qrTimer = setInterval(updateTimer, 1000);
+    }
+    
+    updateQR();
+}
 
-        // ============= РЕЖИМ СОТРУДНИКА =============
-        function showStaffMode(user, balance) {
-            document.getElementById('staff-view').style.display = 'block';
-            document.getElementById('staff-id').textContent = user.id;
-        }
-
-        // ============= РЕЖИМ КЛИЕНТА =============
-        function showClientMode(user, balance) {
-            const clientView = document.getElementById('client-view');
-            clientView.style.display = 'block';
-            
-            document.getElementById('user-name').textContent = user.first_name || 'Клиент';
-            document.getElementById('balance').textContent = balance;
-            
-            startQRGeneration(user.id, balance);
-        }
-
-        // ============= ГЕНЕРАЦИЯ QR-КОДА =============
-        function startQRGeneration(userId, balance) {
-            console.log('Начинаем генерацию QR-кода для пользователя:', userId);
-            
-            function generateQR() {
-                const timestamp = Math.floor(Date.now() / 1000);
-                const dataString = ${userId}:${timestamp}:${SECRET_KEY};
-                
-                // Простая хэш-функция для подписи
-                let hash = 0;
-                for (let i = 0; i < dataString.length; i++) {
-                    const char = dataString.charCodeAt(i);
-                    hash = ((hash << 5) - hash) + char;
-                    hash = hash & hash;
-                }
-                
-                const signature = Math.abs(hash).toString(36).substring(0, 8);
-                
-                // Создаем URL с параметрами (Telegram лучше читает URL)
-                const qrData = https://loyalty.app/scan?uid=${userId}&t=${timestamp}&s=${signature}&b=${balance};
-                
-                console.log('Генерация QR с данными:', qrData);
-                
-                const qrContainer = document.getElementById('qrcode');
-                qrContainer.innerHTML = '';
-                
-                try {
-                    qrCodeInstance = new QRCode(qrContainer, {
-                        text: qrData,
-                        width: 180,
-                        height: 180,
-                        colorDark: "#000000",
-                        colorLight: "#ffffff",
-                        correctLevel: QRCode.CorrectLevel.M
-                    });
-                } catch (error) {
-                    console.error('Ошибка генерации QR:', error);
-                    qrContainer.innerHTML = '<div style="color: red; padding: 20px;">Ошибка QR-кода</div>';
-                }
-            }
-            
-            // Генерируем сразу
-            generateQR();
-            
-            // Таймер обновления QR
-            qrTimer = setInterval(generateQR, QR_TTL * 1000);
-            
-            // Таймер обратного отсчета
-            let timeLeft = QR_TTL;
-            updateTimerDisplay(timeLeft);
-            
-            countdownTimer = setInterval(() => {
-                timeLeft--;
-                if (timeLeft > 0) {
-                    updateTimerDisplay(timeLeft);
-                } else {
-                    timeLeft = QR_TTL;
-                }
-            }, 1000);
-        }
-
-        function updateTimerDisplay(seconds) {
-            const timerElement = document.getElementById('timer');
-            if (timerElement) {
-                timerElement.textContent = QR-код обновится через ${seconds} сек;
-            }
-        }
-
-        // ============= СКАНЕР QR-КОДА (ДЛЯ СОТРУДНИКА) =============
-        function openScanner() {
-            if (!tg || !tg.showScanQrPopup) {
-                alert('Сканер QR-кодов доступен только в Telegram');
+// Сканирование QR (для сотрудника)
+function scanQR() {
+    if (!tg.showScanQrPopup) {
+        tg.showAlert("Сканер недоступен");
+        return;
+    }
+    
+    tg.showScanQrPopup(
+        {text: "Наведите на QR-код клиента"},
+        function(scannedData) {
+            if (!scannedData) {
+                console.log("Сканирование отменено");
                 return;
             }
             
-            const scanConfig = {
-                text: "Наведите камеру на QR-код клиента"
-            };
+            console.log("Отсканировано:", scannedData);
             
-            tg.showScanQrPopup(scanConfig, (scannedData) => {
-                if (!scannedData) {
-                    console.log('Сканирование отменено');
+            // Парсим данные из QR
+            const parts = scannedData.split(':');
+            if (parts[0] === 'LOYALTY' && parts.length === 3) {
+                const userId = parts[1];
+                const timestamp = parseInt(parts[2]);
+                const now = Math.floor(Date.now() / 1000);
+                
+                // Проверяем свежесть QR (не старше 2 минут)
+                if (now - timestamp > 120) {
+                    tg.showAlert("QR-код устарел");
                     return;
                 }
                 
-                console.log('Отсканировано:', scannedData);
-                processScannedData(scannedData);
-            });
-        }
-
-        function processScannedData(data) {
-            try {
-                let userId, timestamp, signature, balance;
-                
-                // Парсим данные из URL
-                if (data.startsWith('http')) {
-                    const url = new URL(data);
-                    userId = url.searchParams.get('uid');
-                    timestamp = url.searchParams.get('t');
-                    signature = url.searchParams.get('s');
-                    balance = url.searchParams.get('b');
-                } else {
-                    // Пытаемся парсить как JSON
-                    const jsonData = JSON.parse(data);
-                    userId = jsonData.uid || jsonData.u;
-                    timestamp = jsonData.t || jsonData.timestamp;
-                    signature = jsonData.s || jsonData.sign;
-                    balance = jsonData.b || jsonData.balance;
-                }
-                
-                if (!userId) {
-                    throw new Error('Неверный формат QR-кода');
-                }
-                
-                // Показываем результат сканирования
-                const scanResult = document.getElementById('scan-result');
-                const scanUser = document.getElementById('scan-user');
-                const scanBalance = document.getElementById('scan-balance');
-                
-                scanUser.textContent = Клиент #${userId};
-                scanBalance.innerHTML = `
-                    <div style="color: #28a745; font-weight: bold; margin: 10px 0; font-size: 16px;">
-                        Баланс: ${balance || '0'} баллов
-                    </div>
-                    <div style="display: flex; gap: 10px; justify-content: center;">
-                        <button onclick="simulatePayment('${userId}', 500)" 
-                                style="padding: 10px 20px; background: #28a745; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                            Чек 500₽
-                        </button>
-                        <button onclick="simulatePayment('${userId}', 1000)" 
-                                style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 8px; cursor: pointer;">
-                            Чек 1000₽
-                        </button>
-                    </div>
-                `;
-                
-                scanResult.style.display = 'block';
-                
-                if (tg && tg.showAlert) {
-                    tg.showAlert('✅ QR-код успешно отсканирован!');
-                } else {
-                    alert('QR-код успешно отсканирован!');
-                }
-                
-            } catch (error) {
-                console.error('Ошибка обработки QR:', error);
-                if (tg && tg.showAlert) {
-                    tg.showAlert('❌ Ошибка: ' + error.message);
-                } else {
-                    alert('Ошибка: ' + error.message);
-                }
-            }
-        }
-
-        // ============= СИМУЛЯЦИЯ ОПЛАТЫ (ДЛЯ ДЕМО) =============
-        function simulatePayment(userId, amount) {
-            const points = Math.floor(amount * 0.05); // 5% кешбэк
-            
-            if (tg && tg.showAlert) {
-                tg.showAlert(✅ Начислено ${points} баллов за покупку на ${amount}₽);
+                // Запрашиваем сумму
+                tg.showPopup({
+                    title: "Введите сумму чека",
+                    message: "Сумма в рублях:",
+                    buttons: [
+                        {id: '500', type: 'default', text: '500'},
+                        {id: '1000', type: 'default', text: '1000'},
+                        {id: '1500', type: 'default', text: '1500'},
+                        {id: 'other', type: 'default', text: 'Другая сумма'},
+                        {id: 'cancel', type: 'cancel', text: 'Отмена'}
+                    ]
+                }, function(btnId) {
+                    if (btnId === 'other') {
+                        tg.showPopup({
+                            title: "Введите сумму",
+                            message: "Например: 750",
+                            buttons: [
+                                {id: 'submit', type: 'default', text: 'Готово'},
+                                {id: 'cancel', type: 'cancel', text: 'Отмена'}
+                            ]
+                        });
+                    } else if (btnId !== 'cancel') {
+                        const amount = parseInt(btnId);
+                        const points = Math.floor(amount * 0.05); // 5% кешбэк
+                        tg.showAlert(✅ Начислено ${points} баллов);
+                    }
+                });
             } else {
-                alert(✅ Начислено ${points} баллов за покупку на ${amount}₽);
-            }
-            
-            // Скрываем результат сканирования
-            document.getElementById('scan-result').style.display = 'none';
-        }
-
-        // ============= УПРАВЛЕНИЕ ВИДИМОСТЬЮ ЭКРАНОВ =============
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-        }
-
-        function showError(message) {
-            hideLoading();
-            document.getElementById('error-view').style.display = 'block';
-            if (message) {
-                document.querySelector('#error-view p').textContent = message;
+                tg.showAlert("Неверный QR-код");
             }
         }
+    );
+}
 
-        function showTestView() {
-            hideLoading();
-            document.getElementById('test-view').style.display = 'block';
-        }
+// Показ ошибки
+function showError(msg) {
+    document.getElementById('loading').innerHTML = <div style="color: red; padding: 40px; text-align: center">${msg}</div>;
+}
 
-        function switchToClient() {
-            document.getElementById('test-view').style.display = 'none';
-            showClientMode({ id: 123456, first_name: 'Тестовый Клиент' }, "250");
-        }
-
-        function switchToStaff() {
-            document.getElementById('test-view').style.display = 'none';
-            showStaffMode({ id: 627287121, first_name: 'Тестовый Сотрудник' }, "0");
-        }
-
-        // ============= ОЧИСТКА РЕСУРСОВ =============
-        function cleanup() {
-            if (qrTimer) clearInterval(qrTimer);
-            if (countdownTimer) clearInterval(countdownTimer);
-            console.log('Ресурсы очищены');
-        }
-
-        // ============= ЗАПУСК ПРИЛОЖЕНИЯ =============
-        // Ждем полной загрузки страницы
-        window.addEventListener('DOMContentLoaded', () => {
-            console.log('DOM загружен, запускаем инициализацию...');
-            
-            // Даем время на загрузку Telegram Web App
-            setTimeout(initApp, 100);
-        });
-
-        // Очистка при закрытии
-        window.addEventListener('beforeunload', cleanup);
-        window.addEventListener('pagehide', cleanup);
-
-        // Для отладки
-        window.debugApp = {
-            reload: () => location.reload(),
-            showTest: showTestView,
-            showClient: switchToClient,
-            showStaff: switchToStaff,
-            getState: () => ({
-                tg: !!tg,
-                user: currentUser,
-                staffIds: STAFF_IDS
-            })
-        };
-    </script>
+// Запуск приложения
+document.addEventListener('DOMContentLoaded', init);
+</script>
 </body>
 </html>
