@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+[10:49, 20.12.2025] Ольга: <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
@@ -94,6 +94,127 @@
                 tg.sendData(data); 
             });
         }
+
+    </script>
+</body>
+</html>
+[11:06, 20.12.2025] Ольга: <!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Loyalty App</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); display: flex; flex-direction: column; align-items: center; padding-top: 20px; margin: 0; }
+        
+        .card { background: var(--tg-theme-secondary-bg-color, #f0f0f0); padding: 20px; border-radius: 15px; text-align: center; width: 85%; max-width: 320px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .balance { font-size: 42px; font-weight: bold; color: #34C759; margin: 10px 0; }
+        #qrcode { margin: 20px auto; background: white; padding: 10px; border-radius: 10px; display: inline-block; }
+        #timer { font-size: 14px; color: var(--tg-theme-hint-color, #888); margin-top: 5px; font-variant-numeric: tabular-nums; }
+        
+        /* СТИЛЬ ДЛЯ КНОПКИ КАССИРА (Видна только избранным) */
+        #staff-panel { display: none; width: 85%; max-width: 320px; margin-bottom: 20px; }
+        .scan-btn { 
+            width: 100%; 
+            padding: 15px; 
+            background-color: #007AFF; 
+            color: white; 
+            border: none; 
+            border-radius: 12px; 
+            font-size: 18px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            box-shadow: 0 4px 10px rgba(0,122,255,0.3);
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+        .scan-btn:active { transform: scale(0.98); }
+    </style>
+</head>
+<body>
+
+    <div id="staff-panel">
+        <button class="scan-btn" onclick="openScanner()">
+            📷 СКАНИРОВАТЬ КЛИЕНТА
+        </button>
+    </div>
+
+    <div class="card">
+        <h2 id="username">Загрузка...</h2>
+        <div>Ваши баллы:</div>
+        <div class="balance" id="balance">...</div>
+        <div id="qrcode"></div>
+        <div id="timer">Обновление через 30 сек</div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+        const user = tg.initDataUnsafe.user;
+        
+        // --- НАСТРОЙКИ ---
+        const SECRET_KEY = "MY_SUPER_SECRET_KEY"; 
+        
+        // !!! СПИСОК ID КАССИРОВ !!!
+        // Сюда вписываешь ID всех, у кого должна быть кнопка сканера
+        // Сейчас вписан ТВОЙ ID.
+        const STAFF_IDS = [
+            627287121,  // Это ты (Ольга)
+            123456789   // Сюда добавишь потом ID сменщика через запятую
+        ];
+
+        // --- 1. ПРОВЕРКА: КАССИР ИЛИ НЕТ? ---
+        if (user && STAFF_IDS.includes(user.id)) {
+            // Если ID совпал со списком -> Показываем кнопку
+            document.getElementById('staff-panel').style.display = 'block';
+        }
+
+        // --- 2. ЛОГИКА СКАНЕРА (Без пароля!) ---
+        function openScanner() {
+            tg.showScanQrPopup({
+                text: 'Наведите на QR клиента'
+            }, (data) => {
+                tg.closeScanQrPopup();
+                tg.sendData(data); // Отправляем данные в n8n
+            });
+        }
+
+        // --- 3. ОБЫЧНАЯ ЛОГИКА (БАЛЛЫ И QR) ---
+        if (user) document.getElementById('username').innerText = user.first_name;
+        
+        const urlParams = new URLSearchParams(window.location.search);
+        document.getElementById('balance').innerText = urlParams.get('balance') || "0";
+
+        let timeLeft = 30;
+        function updateTimerVisual() {
+            document.getElementById('timer').innerText = Обновление через ${timeLeft} сек;
+            timeLeft--;
+            if (timeLeft < 0) timeLeft = 30;
+        }
+
+        function generateSecureQR() {
+            const userId = user ? user.id.toString() : "DEMO";
+            const timestamp = Math.floor(Date.now() / 1000);
+            
+            const dataToSign = userId + timestamp;
+            const hash = CryptoJS.HmacSHA256(dataToSign, SECRET_KEY).toString(CryptoJS.enc.Hex);
+            
+            const qrData = JSON.stringify({
+                u: userId,
+                t: timestamp,
+                s: hash.substring(0, 10)
+            });
+
+            document.getElementById("qrcode").innerHTML = "";
+            new QRCode(document.getElementById("qrcode"), { text: qrData, width: 180, height: 180 });
+            timeLeft = 30; updateTimerVisual();
+        }
+
+        generateSecureQR();
+        setInterval(generateSecureQR, 30000); 
+        setInterval(updateTimerVisual, 1000);
 
     </script>
 </body>
