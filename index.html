@@ -33,6 +33,7 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
         const user = tg.initDataUnsafe?.user;
+        const SECRET_KEY = "SECRET"; // Должен совпадать в приложении и n8n
         const STAFF_IDS = [627287121]; // Твой ID
 
         if (!user) {
@@ -42,35 +43,50 @@
         }
 
         function initApp() {
+            // Баланс из start_param (твоя правка)
             const startParam = tg.initDataUnsafe?.start_param || "0";
             document.getElementById('balance').innerText = startParam;
 
             if (STAFF_IDS.includes(user.id)) {
                 document.getElementById('staff-view').style.display = 'block';
             } else {
-                document.getElementById('client-view').style.display = 'block';
+                document.getElementById('client-screen' || 'client-view').style.display = 'block';
                 document.getElementById('username').innerText = user.first_name;
                 startLoyaltyLogic();
             }
         }
 
+        // ПРАВИЛЬНАЯ РЕАЛИЗАЦИЯ СКАНЕРА (согласно вложению)
         function openScanner() {
-            tg.showScanQrPopup({ text: 'Наведите на QR клиента' }, (data) => {
-                tg.closeScanQrPopup();
-                tg.sendData(data); // Отправка данных в n8n
-            });
+            tg.showScanQrPopup(
+                { text: 'Наведите на QR клиента' },
+                (data) => {
+                    if (!data) return;
+                    // Telegram сам закроет попап, но мы можем подстраховаться
+                    tg.closeScanQrPopup();
+                    tg.sendData(data); // Отправка данных боту
+                }
+            );
         }
 
         function startLoyaltyLogic() {
             let timeLeft = 30;
             const updateQR = () => {
                 const ts = Math.floor(Date.now() / 1000);
-                const hash = CryptoJS.HmacSHA256(user.id + ts, "SECRET").toString().substring(0, 10);
-                const qrData = JSON.stringify({ u: user.id, t: ts, s: hash });
+                // HMAC-подпись согласно Главе 8.1
+                const hash = CryptoJS.HmacSHA256(user.id + ts, SECRET_KEY).toString(CryptoJS.enc.Hex).substring(0, 10);
+                
+                [span_7](start_span)// Компактный JSON без пробелов для быстрого считывания[span_7](end_span)
+                const qrData = JSON.stringify({u:user.id,t:ts,s:hash});
                 
                 const qrDiv = document.getElementById("qrcode");
                 qrDiv.innerHTML = "";
-                new QRCode(qrDiv, { text: qrData, width: 180, height: 180 });
+                new QRCode(qrDiv, { 
+                    text: qrData, 
+                    width: 200, 
+                    height: 200, 
+                    [span_8](start_span)correctLevel: QRCode.CorrectLevel.L // Уровень L для быстроты[span_8](end_span)
+                });
                 timeLeft = 30;
             };
 
@@ -78,7 +94,9 @@
             setInterval(updateQR, 30000);
             setInterval(() => {
                 timeLeft--;
-                if (timeLeft >= 0) document.getElementById('timer').innerText = "Обновление через " + timeLeft + " сек";
+                if (timeLeft >= 0) {
+                    document.getElementById('timer').innerText = "Обновление через " + timeLeft + " сек";
+                }
             }, 1000);
         }
     </script>
