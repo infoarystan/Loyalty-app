@@ -32,81 +32,75 @@
     </div>
 
 <script>
-const STAFF_IDS = [627287121]; 
-const SECRET_KEY = "MY_SECRET_KEY"; 
-let tg = window.Telegram.WebApp;
+    const STAFF_IDS = [627287121]; 
+    const SECRET_KEY = "MY_SECRET_KEY"; 
+    const tg = window.Telegram.WebApp;
 
-// Сообщаем Telegram, что приложение готово к отрисовке
-tg.ready();
-tg.expand();
+    tg.ready();
+    tg.expand();
 
-const user = tg.initDataUnsafe?.user;
+    const user = tg.initDataUnsafe?.user;
 
-if (!user) {
-    document.body.innerHTML = '<h3 style="padding:20px; text-align:center;">Пожалуйста, откройте карту через Telegram</h3>';
-} else {
-    initApp();
-}
-
-function initApp() {
-    // Используем твой метод start_param для баланса
-    const startBalance = tg.initDataUnsafe?.start_param || "0";
-    document.getElementById('balance').innerText = startBalance;
-
-    if (STAFF_IDS.includes(user.id)) {
-        document.getElementById('staff-view').style.display = 'block';
+    if (!user) {
+        document.body.innerHTML = '<h3 style="padding:20px; text-align:center;">Пожалуйста, откройте карту через Telegram</h3>';
     } else {
-        document.getElementById('client-view').style.display = 'block';
-        document.getElementById('username').innerText = user.first_name || "Гость";
-        startLoyaltyCycle();
+        initApp();
     }
-}
 
-function openScanner() {
-    tg.showScanQrPopup({ text: 'Наведите на QR клиента' }, (data) => {
-        if (!data) return;
-        [span_9](start_span)// По твоей инструкции: Сначала закрываем, потом отправляем данные[span_9](end_span)
-        tg.closeScanQrPopup();
-        tg.sendData(data); 
-    });
-}
+    function initApp() {
+        const startBalance = tg.initDataUnsafe?.start_param || "0";
+        document.getElementById('balance').innerText = startBalance;
 
-function startLoyaltyCycle() {
-    let timeLeft = 30;
-
-    function updateQR() {
-        try {
-            const timestamp = Math.floor(Date.now() / 1000);
-            // Хеширование теперь заработает, так как библиотека подключена
-            const hash = CryptoJS.HmacSHA256(user.id.toString() + timestamp.toString(), SECRET_KEY).toString(CryptoJS.enc.Hex).substring(0,10);
-
-            [span_10](start_span)// Компактный JSON без пробелов (Глава 8.2)[span_10](end_span)
-            const qrData = JSON.stringify({u:user.id,t:timestamp,s:hash});
-
-            const qrDiv = document.getElementById("qrcode");
-            qrDiv.innerHTML = "";
-            new QRCode(qrDiv, { 
-                text: qrData, 
-                width:200, 
-                height:200, 
-                correctLevel: QRCode.CorrectLevel.M 
-            });
-            timeLeft = 30;
-        } catch (e) {
-            console.error("QR Error:", e);
+        if (STAFF_IDS.includes(user.id)) {
+            document.getElementById('staff-view').style.display = 'block';
+        } else {
+            document.getElementById('client-view').style.display = 'block';
+            document.getElementById('username').innerText = user.first_name || "Гость";
+            startLoyaltyCycle();
         }
     }
 
-    updateQR();
-    setInterval(updateQR, 30000);
+    function openScanner() {
+        tg.showScanQrPopup({ text: 'Наведите на QR клиента' }, (data) => {
+            if (!data) return;
+            tg.closeScanQrPopup();
+            tg.sendData(data); 
+        });
+    }
 
-    setInterval(() => {
-        timeLeft--;
-        if (timeLeft >= 0) {
-            document.getElementById('timer').innerText = Код обновится через ${timeLeft} сек;
+    function startLoyaltyCycle() {
+        let timeLeft = 30;
+
+        function updateQR() {
+            try {
+                const timestamp = Math.floor(Date.now() / 1000);
+                const hash = CryptoJS.HmacSHA256(user.id.toString() + timestamp.toString(), SECRET_KEY).toString(CryptoJS.enc.Hex).substring(0,10);
+                const qrData = JSON.stringify({u:user.id,t:timestamp,s:hash});
+
+                const qrDiv = document.getElementById("qrcode");
+                qrDiv.innerHTML = "";
+                new QRCode(qrDiv, { 
+                    text: qrData, 
+                    width:200, 
+                    height:200, 
+                    correctLevel: QRCode.CorrectLevel.M 
+                });
+                timeLeft = 30;
+            } catch (e) {
+                console.error("QR Error:", e);
+            }
         }
-    }, 1000);
-}
+
+        updateQR();
+        setInterval(updateQR, 30000);
+
+        setInterval(() => {
+            timeLeft--;
+            if (timeLeft >= 0) {
+                document.getElementById('timer').innerText = "Код обновится через " + timeLeft + " сек";
+            }
+        }, 1000);
+    }
 </script>
 </body>
 </html>
